@@ -6,7 +6,6 @@ from .mesh_object_classes import *
 from .ui import *
 from .utils import *
 
-
 # Export Path
 def GetExportPath(abspath=False):
     scene = bpy.context.scene

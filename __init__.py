@@ -34,7 +34,7 @@ class DFFN_AddonPreferences(bpy.types.AddonPreferences):
         row.operator("dft.update_from_github", icon="FILE_REFRESH")
 
 
-# все регистрируемые классы
+# все регистрируемые классы 
 classes = (
     DFT_PT_export_panel,
     Exportfbx,

@@ -11,7 +11,6 @@ from bpy.props import (
     )
 
 
-
 # UI Tab for Export
 class DFT_PT_export_panel(bpy.types.Panel):
     bl_idname = "DFT_PT_export_panel"

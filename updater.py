@@ -7,6 +7,7 @@ import tempfile
 import zipfile
 import urllib.request
 
+
 def _addon_root():
     # Папка модуля аддона (верхняя директория пакета)
     import importlib
