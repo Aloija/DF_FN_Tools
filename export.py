@@ -60,37 +60,56 @@ def ExportMeshes(obj_dict, path):
 
     for key in obj_dict:
         meshes = obj_dict[key]
+        
+        if not meshes:
+            continue
 
-        # определяем тип LOD по первому элементу группы
-        lod_type = meshes[0].lod if meshes else None
-
-        # все LOD1–LOD3 уезжают в подпапку LODs
-        target_dir = lods_dir if lod_type in ["LOD1", "LOD2", "LOD3"] else path
-        final_path = os.path.join(target_dir, str(key))
-
+        # Группируем меши по типу LOD
+        lod_groups = {}
         for mesh in meshes:
-            mesh.data.select_set(True)
+            lod_type = mesh.lod
+            if lod_type not in lod_groups:
+                lod_groups[lod_type] = []
+            lod_groups[lod_type].append(mesh)
 
-        if bpy.app.version >= (4, 2):
-            bpy.ops.export_scene.fbx(
-                filepath=final_path + ".fbx",
-                use_selection=True,
-                mesh_smooth_type="FACE",
-                bake_space_transform=False,
-                axis_forward="Y",
-                axis_up="Z",
-                bake_anim=False
-            )
-        else:
-            bpy.ops.export_scene.fbx(
-                filepath=final_path + ".fbx",
-                use_selection=True,
-                mesh_smooth_type="FACE",
-                bake_space_transform=False,
-                bake_anim=False
-            )
+        # Экспортируем каждую группу LOD отдельно
+        for lod_type, lod_meshes in lod_groups.items():
+            # LOD1–LOD3 идут в подпапку LODs
+            if lod_type in ["LOD1", "LOD2", "LOD3"]:
+                target_dir = lods_dir
+                # Для LOD1-LOD3 добавляем суффикс к имени файла
+                file_name = f"{key}_{lod_type}"
+            else:
+                target_dir = path
+                file_name = str(key)
+            
+            final_path = os.path.join(target_dir, file_name)
 
-        bpy.ops.object.select_all(action='DESELECT')
+            # Выделяем все меши текущей группы LOD
+            for mesh in lod_meshes:
+                mesh.data.select_set(True)
+
+            # Экспортируем FBX
+            if bpy.app.version >= (4, 2):
+                bpy.ops.export_scene.fbx(
+                    filepath=final_path + ".fbx",
+                    use_selection=True,
+                    mesh_smooth_type="FACE",
+                    bake_space_transform=False,
+                    axis_forward="Y",
+                    axis_up="Z",
+                    bake_anim=False
+                )
+            else:
+                bpy.ops.export_scene.fbx(
+                    filepath=final_path + ".fbx",
+                    use_selection=True,
+                    mesh_smooth_type="FACE",
+                    bake_space_transform=False,
+                    bake_anim=False
+                )
+
+            bpy.ops.object.select_all(action='DESELECT')
 
 
 # Export button
