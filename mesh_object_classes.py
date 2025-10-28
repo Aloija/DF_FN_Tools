@@ -1,4 +1,4 @@
-import bpy
+import bpy # type: ignore
 from .utils import *
 
 class MehsObject:
@@ -12,14 +12,16 @@ class MehsObject:
 
 
 def obj_init(obj): 
-    prefix = obj.name.split("_")[0]
+    name_parts = obj.name.split("_")
+    prefix = name_parts[0]
+    second_part = name_parts[1] if len(name_parts) > 1 else None
     obj.lod = prefix
     lods = ["LOD1", "LOD2", "LOD3"]
     
-    if obj.lod == "SM":
-        if obj.name.split("_")[1] == "NITE":
-            obj.exportname = obj.name
-            obj.lod = "NITE"
+    if (prefix == "SM" and second_part == "NITE") or (prefix == "NITE" and second_part == "SM"):
+        obj.exportname = obj.name
+        obj.lod = "NITE"
+        return
     if obj.lod == "LOD0":
         obj.exportname = obj.name[5:]
         return

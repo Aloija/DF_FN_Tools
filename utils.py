@@ -39,7 +39,8 @@ def name_validation (obj):
         else:
             return valid_msg
     else:
-        if name[1] == "NITE":
+        has_second_part = len(name) > 1
+        if (has_second_part and name[1] == "NITE") or (name[0] == "NITE" and has_second_part and name[1] == "SM"):
             return valid_msg
         else: 
             valid_msg = (obj.name + " has incorrect prefix: " + str(name[0]))

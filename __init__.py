@@ -1,15 +1,15 @@
-import bpy
+import bpy # type: ignore
 from .export import *
 from .ui import *
 from . import updater   # <--- новый импорт
-from bpy.props import IntProperty, BoolProperty, StringProperty
+from bpy.props import IntProperty, BoolProperty, StringProperty # type: ignore
 
 
 bl_info = {
     "name": "DF FN Tools",
     "description": "DF FN Tools",
     "author": "Aloija, GPT",
-    "version": (1, 6, 0),
+    "version": (1, 6, 1),
     "blender": (4, 4, 0),
     "category": "Object"
 }
@@ -23,7 +23,7 @@ class DFFN_AddonPreferences(bpy.types.AddonPreferences):
         name="ZIP URL",
         description="Ссылка на ZIP main ветки репозитория",
         default="https://github.com/Aloija/DF_FN_Tools/archive/refs/heads/main.zip"
-    )
+    ) # type: ignore
 
     def draw(self, context):
         layout = self.layout

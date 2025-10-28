@@ -1,5 +1,5 @@
 # export.py
-import bpy
+import bpy # type: ignore
 import os
 
 from .mesh_object_classes import *
@@ -56,6 +56,8 @@ def ExportMeshes(obj_dict, path):
     # создаем подпапку для LOD1–LOD3
     lods_dir = os.path.join(path, "LODs")
     create_dir(lods_dir)
+    nanite_dir = os.path.join(path, "Nanite")
+    create_dir(nanite_dir)
 
     for key in obj_dict:
         meshes = obj_dict[key]
@@ -64,7 +66,12 @@ def ExportMeshes(obj_dict, path):
         lod_type = meshes[0].lod if meshes else None
 
         # все LOD1–LOD3 уезжают в подпапку LODs
-        target_dir = lods_dir if lod_type in ["LOD1", "LOD2", "LOD3"] else path
+        if lod_type in ["LOD1", "LOD2", "LOD3"]:
+            target_dir = lods_dir
+        elif lod_type == "NITE":
+            target_dir = nanite_dir
+        else:
+            target_dir = path
         final_path = os.path.join(target_dir, str(key))
 
         for mesh in meshes:
