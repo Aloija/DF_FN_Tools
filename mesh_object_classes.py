@@ -18,7 +18,7 @@ def obj_init(obj):
     obj.lod = prefix
     lods = ["LOD1", "LOD2", "LOD3"]
     
-    if (prefix == "SM" and second_part == "NITE") or (prefix == "NITE" and second_part == "SM"):
+    if (prefix == "SM" and second_part == "NITE"):
         obj.exportname = obj.name
         obj.lod = "NITE"
         return
