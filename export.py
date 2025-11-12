@@ -6,6 +6,7 @@ from .mesh_object_classes import *
 from .ui import *
 from .utils import *
 
+
 # Export Path
 def GetExportPath(abspath=False):
     scene = bpy.context.scene
@@ -75,7 +76,7 @@ def ExportMeshes(obj_dict, path):
         final_path = os.path.join(target_dir, str(key))
 
         for mesh in meshes:
-            mesh.data.select_set(True)
+            mesh.select_set(True)
 
         if bpy.app.version >= (4, 2):
             bpy.ops.export_scene.fbx(
@@ -164,15 +165,15 @@ class Exportfbx(bpy.types.Operator):
 
         # Delete doubles
         for obj in dublicate_selection:
-            bpy.data.objects.remove(obj.data)
+            bpy.data.objects.remove(obj.bl_object)
 
         # Rename origs back
         for obj in orig_selection:
-            obj.data.name = obj.orig_name
+            obj.name = obj.orig_name
 
         view_layer.objects.active = obj_active
         for obj in orig_selection:
-            obj.data.select_set(True)
+            obj.select_set(True)
         hide_back(hidden_selection)
 
         orig_selection = None
