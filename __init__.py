@@ -21,19 +21,13 @@ bl_info = {
 class DFFN_AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
-    repo_zip_url: StringProperty(
-        name="ZIP URL",
-        description="Ссылка на ZIP main ветки репозитория",
-        default="https://github.com/Aloija/DF_FN_Tools/archive/refs/heads/main.zip"
-    ) # type: ignore
-
     def draw(self, context):
         layout = self.layout
         box = layout.box()
         box.label(text="GitHub Update")
-        box.prop(self, "repo_zip_url")
         row = box.row()
         row.operator("dft.update_from_github", icon="FILE_REFRESH")
+
 
 
 # все регистрируемые классы 

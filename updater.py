@@ -1,4 +1,5 @@
 # updater.py
+import addon_utils  # type: ignore
 import bpy # type: ignore
 import os
 import sys
@@ -7,6 +8,7 @@ import tempfile
 import zipfile
 import urllib.request
 
+DEFAULT_REPO_ZIP_URL = "https://github.com/Aloija/DF_FN_Tools/archive/refs/heads/main.zip"
 
 def _addon_root():
     # Папка модуля аддона (верхняя директория пакета)
@@ -26,15 +28,33 @@ def _copy_tree(src, dst):
             dst_f = os.path.join(target_dir, f)
             shutil.copy2(src_f, dst_f)
 
+def _reload_addon(pkg_name: str):
+    """Force Blender to re-import the add-on modules after files change."""
+    import importlib
+
+    try:
+        addon_utils.disable(pkg_name, default_set=False, handle_error=None)
+    except Exception:
+        pass
+
+    prefix = f"{pkg_name}."
+    for module_name in [m for m in list(sys.modules) if m == pkg_name or m.startswith(prefix)]:
+        sys.modules.pop(module_name, None)
+
+    importlib.invalidate_caches()
+
+    enabled, error_message = addon_utils.enable(pkg_name, default_set=False, handle_error=None)
+    if not enabled:
+        raise RuntimeError(error_message or f"Failed to reload add-on {pkg_name}")
+
 class DFT_OT_update_from_github(bpy.types.Operator):
     """Скачать и установить последнюю версию из main ветки"""
     bl_idname = "dft.update_from_github"
-    bl_label = "Update from GitHub (main)"
+    bl_label = "Update from GitHub"
     bl_options = {'INTERNAL'}
 
     def execute(self, context):
-        prefs = context.preferences.addons.get(__package__.split('.')[0]).preferences
-        repo_zip_url = prefs.repo_zip_url or "https://github.com/Aloija/DF_FN_Tools/archive/refs/heads/main.zip"
+        repo_zip_url = DEFAULT_REPO_ZIP_URL
         addon_root = _addon_root()
 
         self.report({'INFO'}, "Downloading update...")
@@ -70,16 +90,9 @@ class DFT_OT_update_from_github(bpy.types.Operator):
 
             # 4) Попробовать горячую перезагрузку аддона
             pkg_name = __package__.split('.')[0] if __package__ else __name__.split('.')[0]
-            try:
-                bpy.ops.preferences.addon_disable(module=pkg_name)
-            except Exception:
-                pass
-            try:
-                bpy.ops.preferences.addon_enable(module=pkg_name)
-            except Exception:
-                pass
+            _reload_addon(pkg_name)
 
-            self.report({'INFO'}, "DF_FN_Tools обновлен из main")
+            self.report({'INFO'}, "DF_FN_Tools обновлен")
             return {'FINISHED'}
 
         except Exception as e:
