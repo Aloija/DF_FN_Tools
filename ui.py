@@ -110,3 +110,4 @@ def draw_popover(self, context):
 
 def draw_object_context_menu(self, context):
     self.layout.operator("object.duplicate_clean_join", text="Clean Join", icon='MODIFIER')
+    self.layout.operator("object.rename_uv", text="Rename UVs")

@@ -187,6 +187,17 @@ def hide_back(hidden_selection):
         obj.hide_set(True)
 
 
+def rename_uv():
+    context = bpy.context
+
+    for obj in context.selected_objects:
+        try:
+            obj.data.uv_layers.data.uv_layer_stencil.name = 'map1'
+            obj.data.uv_layers.new(name='uvSet1')
+        except:    
+            continue
+
+
 def get_materials(self, context):
     return [(mat.name, mat.name, "") for mat in bpy.data.materials]
 
@@ -236,161 +247,4 @@ def get_split_vertex_count():
 
         uv_data = [uv.data for uv in uv_layers]
         col_data = [col.data for col in color_layers]
-
-        unique_corners = set()
-
-        for tri in tris:
-            mat_idx = tri.material_index
-            for li in tri.loops:
-                lp = loops[li]
-                key = (
-                    lp.vertex_index,
-                    r6(lp.normal.x), r6(lp.normal.y), r6(lp.normal.z),
-                    r6(lp.tangent.x) if uv_layers else 0.0,
-                    r6(lp.tangent.y) if uv_layers else 0.0,
-                    r6(lp.tangent.z) if uv_layers else 0.0,
-                    r6(lp.bitangent_sign) if uv_layers else 0.0,
-                    mat_idx,
-                )
-                for data in uv_data:
-                    uv = data[li].uv
-                    key += (r6(uv.x), r6(uv.y))
-                for data in col_data:
-                    c = data[li].color
-                    key += (r4(c[0]), r4(c[1]), r4(c[2]), r4(c[3]))
-                unique_corners.add(key)
-
-        total_vertices += len(unique_corners)
-        eval_obj.to_mesh_clear()
-
-    return total_vertices
-
-
-def update_split_vertex_count(scene):
-    obj = bpy.context.view_layer.objects.active
-    if obj:
-        count = get_split_vertex_count()
-        scene.split_vertex_count = count
-    else:
-        scene.split_vertex_count = -1
-
-
-# Clean Join operator: duplicate selection, apply mods, join
-class OBJECT_OT_duplicate_clean_join(bpy.types.Operator):
-    bl_idname = "object.duplicate_clean_join"
-    bl_label = "Clean Join"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        selected_objects = context.selected_objects
-
-        if not selected_objects:
-            self.report({'WARNING'}, "No objects selected")
-            return {'CANCELLED'}
-
-        try:
-            bpy.ops.object.mode_set(mode='OBJECT')
-        except Exception:
-            pass
-
-        bpy.ops.object.duplicate(linked=False)
-        dup_objects = list(context.selected_objects)
-
-        for obj in dup_objects:
-            context.view_layer.objects.active = obj
-            try:
-                bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', object=True, obdata=True)
-            except Exception:
-                pass
-
-            bpy.ops.object.select_all(action='DESELECT')
-            obj.select_set(True)
-
-            try:
-                bpy.ops.object.mode_set(mode='OBJECT')
-            except Exception:
-                pass
-
-            for mod in list(obj.modifiers):
-                if mod.show_viewport:
-                    try:
-                        bpy.ops.object.modifier_apply(modifier=mod.name)
-                    except Exception:
-                        # Ignore modifiers that fail to apply
-                        continue
-
-        bpy.ops.object.select_all(action='DESELECT')
-        for obj in dup_objects:
-            obj.select_set(True)
-        context.view_layer.objects.active = dup_objects[0]
-        rename_uv()
-        bpy.ops.object.join()
-
-        joined_obj = context.active_object
-
-        export_coll = bpy.data.collections.get("Export")
-        if export_coll and joined_obj:
-            if joined_obj.name not in export_coll.objects:
-                export_coll.objects.link(joined_obj)
-            for coll in list(joined_obj.users_collection):
-                if coll.name != "Export":
-                    try:
-                        coll.objects.unlink(joined_obj)
-                    except Exception:
-                        pass
-
-        return {'FINISHED'}
-
-
-def rename_uv():
-    context = bpy.context
-    for obj in [o for o in context.selected_objects if o.type == 'MESH' and hasattr(o, 'data') and o.data]:
-        mesh = obj.data
-        uv_layers = mesh.uv_layers
-        # Ensure at least one UV layer exists
-        if len(uv_layers) == 0:
-            uv_layers.new(name='map1')
-        # Rename first channel to 'map1'
-        uv_layers[0].name = 'map1'
-        # Ensure second channel exists and rename to 'uvSet1'
-        if len(uv_layers) < 2:
-            uv_layers.new(name='uvSet1')
-        else:
-            uv_layers[1].name = 'uvSet1'
-        # If there is a third channel, merge it into the first
-        if len(uv_layers) >= 3:
-            first_layer = uv_layers[0]
-            third_layer = uv_layers[2]
-            # Merge rule: copy UVs from the 3rd layer into the 1st
-            # only where the 1st layer UVs are (0,0). This keeps
-            # existing 1st layer data while augmenting from the 3rd.
-            loop_count = len(mesh.loops)
-            for li in range(loop_count):
-                uv1 = first_layer.data[li].uv
-                uv3 = third_layer.data[li].uv
-                if abs(uv1.x) < 1e-6 and abs(uv1.y) < 1e-6:
-                    first_layer.data[li].uv = (uv3.x, uv3.y)
-            # Remove the third layer after merge
-            uv_layers.remove(third_layer)
-        # Remove all channels beyond the first two
-        while len(uv_layers) > 2:
-            uv_layers.remove(uv_layers[-1])
-        # Re-assert names in case indices shifted after removals
-        uv_layers[0].name = 'map1'
-        if len(uv_layers) >= 2:
-            uv_layers[1].name = 'uvSet1'
-
-
-class OBJECT_OT_rename_uv(bpy.types.Operator):
-    bl_idname = "object.rename_uv"
-    bl_label = "Rename UVs"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        try:
-            rename_uv()
-        except Exception as e:
-            self.report({'ERROR'}, f"Failed to rename UVs: {e}")
-            return {'CANCELLED'}
-        return {'FINISHED'}
 
