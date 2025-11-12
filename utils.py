@@ -311,7 +311,26 @@ class OBJECT_OT_duplicate_clean_join(bpy.types.Operator):
             except Exception:
                 pass
 
+            try:
+                bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+            except Exception:
+                pass
+
+            try:
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.normals_make_consistent(inside=False)
+            except Exception:
+                pass
+            finally:
+                try:
+                    bpy.ops.object.mode_set(mode='OBJECT')
+                except Exception:
+                    pass
+
             for mod in list(obj.modifiers):
+                if mod.type == 'TRIANGULATE':
+                    continue  # keep triangulate modifiers intact
                 if mod.show_viewport:
                     try:
                         bpy.ops.object.modifier_apply(modifier=mod.name)
@@ -327,6 +346,14 @@ class OBJECT_OT_duplicate_clean_join(bpy.types.Operator):
         bpy.ops.object.join()
 
         joined_obj = context.active_object
+
+        if joined_obj:
+            source_colls = [coll for coll in joined_obj.users_collection if coll.name != "Scene Collection"]
+            if source_colls:
+                new_name = source_colls[0].name
+                joined_obj.name = new_name
+                if getattr(joined_obj, "data", None):
+                    joined_obj.data.name = new_name
 
         export_coll = bpy.data.collections.get("Export")
         if export_coll and joined_obj:
