@@ -6,6 +6,72 @@ from .mesh_object_classes import *
 from .ui import *
 from .utils import *
 
+# Clean Join operator: duplicate selection, apply mods, join
+class OBJECT_OT_duplicate_clean_join(bpy.types.Operator):
+    bl_idname = "object.duplicate_clean_join"
+    bl_label = "Clean Join"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        selected_objects = context.selected_objects
+
+        if not selected_objects:
+            self.report({'WARNING'}, "No objects selected")
+            return {'CANCELLED'}
+
+        try:
+            bpy.ops.object.mode_set(mode='OBJECT')
+        except Exception:
+            pass
+
+        bpy.ops.object.duplicate(linked=False)
+        dup_objects = list(context.selected_objects)
+
+        for obj in dup_objects:
+            context.view_layer.objects.active = obj
+            try:
+                bpy.ops.object.make_single_user(type='SELECTED_OBJECTS', object=True, obdata=True)
+            except Exception:
+                pass
+
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+
+            try:
+                bpy.ops.object.mode_set(mode='OBJECT')
+            except Exception:
+                pass
+
+            for mod in list(obj.modifiers):
+                if mod.show_viewport:
+                    try:
+                        bpy.ops.object.modifier_apply(modifier=mod.name)
+                    except Exception:
+                        # Ignore modifiers that fail to apply
+                        continue
+
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in dup_objects:
+            obj.select_set(True)
+        context.view_layer.objects.active = dup_objects[0]
+        bpy.ops.object.join()
+
+        joined_obj = context.active_object
+
+        export_coll = bpy.data.collections.get("Export")
+        if export_coll and joined_obj:
+            if joined_obj.name not in export_coll.objects:
+                export_coll.objects.link(joined_obj)
+            for coll in list(joined_obj.users_collection):
+                if coll.name != "Export":
+                    try:
+                        coll.objects.unlink(joined_obj)
+                    except Exception:
+                        pass
+
+        return {'FINISHED'}
+
+
 # Export Path
 def GetExportPath(abspath=False):
     scene = bpy.context.scene
@@ -75,7 +141,7 @@ def ExportMeshes(obj_dict, path):
         final_path = os.path.join(target_dir, str(key))
 
         for mesh in meshes:
-            mesh.data.select_set(True)
+            mesh.select_set(True)
 
         if bpy.app.version >= (4, 2):
             bpy.ops.export_scene.fbx(
@@ -164,15 +230,15 @@ class Exportfbx(bpy.types.Operator):
 
         # Delete doubles
         for obj in dublicate_selection:
-            bpy.data.objects.remove(obj.data)
+            bpy.data.objects.remove(obj.bl_object)
 
         # Rename origs back
         for obj in orig_selection:
-            obj.data.name = obj.orig_name
+            obj.name = obj.orig_name
 
         view_layer.objects.active = obj_active
         for obj in orig_selection:
-            obj.data.select_set(True)
+            obj.select_set(True)
         hide_back(hidden_selection)
 
         orig_selection = None

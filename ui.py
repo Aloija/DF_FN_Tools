@@ -106,3 +106,7 @@ def draw_popover(self, context):
 
 
     row.prop(context.scene, "auto_update_split_vertex_count", text="", icon='FILE_REFRESH', toggle=True)
+
+
+def draw_object_context_menu(self, context):
+    self.layout.operator("object.duplicate_clean_join", text="Clean Join", icon='MODIFIER')

@@ -1,8 +1,9 @@
-import bpy # type: ignore
+import bpy  # type: ignore
+from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty  # type: ignore
+
+from . import handlers, updater, utils   # <--- новый импорт
 from .export import *
 from .ui import *
-from . import updater   # <--- новый импорт
-from bpy.props import IntProperty, BoolProperty, StringProperty # type: ignore
 
 
 bl_info = {
@@ -39,41 +40,87 @@ classes = (
     DFT_PT_export_panel,
     Exportfbx,
     Open_Folder,
+    OBJECT_OT_duplicate_clean_join,
     DFFN_AddonPreferences,           # <--- добавлено
     updater.DFT_OT_update_from_github,  # <--- добавлено
 )
+
+
+def register_scene_properties():
+    bpy.types.Scene.auto_update_split_vertex_count = BoolProperty(
+        name="Auto Update Split Vertex Count",
+        default=False,
+        description="Automatically update split vertex count on scene changes",
+    )
+
+    bpy.types.Scene.split_vertex_count = IntProperty(
+        name="Split Vertex Count",
+        default=-1,
+        description="Number of split vertices based on UV and normals",
+    )
+
+    for i in range(utils.MATERIAL_REASSIGN_SLOT_COUNT):
+        setattr(
+            bpy.types.Scene,
+            f"material_from_{i}",
+            EnumProperty(
+                name=f"Material {i + 1}",
+                description="Select a material to reassign",
+                items=utils.get_materials,
+            ),
+        )
+        setattr(
+            bpy.types.Scene,
+            f"material_to_{i}",
+            StringProperty(
+                name="New Name",
+                description="Enter a new material name",
+                default="",
+            ),
+        )
+
+
+def unregister_scene_properties():
+    for i in range(utils.MATERIAL_REASSIGN_SLOT_COUNT):
+        from_attr = f"material_from_{i}"
+        to_attr = f"material_to_{i}"
+        if hasattr(bpy.types.Scene, from_attr):
+            delattr(bpy.types.Scene, from_attr)
+        if hasattr(bpy.types.Scene, to_attr):
+            delattr(bpy.types.Scene, to_attr)
+
+    for attr in ("auto_update_split_vertex_count", "split_vertex_count"):
+        if hasattr(bpy.types.Scene, attr):
+            delattr(bpy.types.Scene, attr)
 
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
-    bpy.types.Scene.auto_update_split_vertex_count = BoolProperty(
-        name="Auto Update Split Vertex Count",
-        default=False,
-        description="Automatically update split vertex count on scene changes"
-    )
-
-    bpy.types.Scene.split_vertex_count = IntProperty(
-        name="Split Vertex Count",
-        default=-1,
-        description="Number of split vertices based on UV and normals"
-    )
-
+    register_scene_properties()
     bpy.types.TOPBAR_MT_editor_menus.append(draw_popover)
+    bpy.types.VIEW3D_MT_object_context_menu.append(draw_object_context_menu)
 
-    bpy.app.handlers.load_post.append(load_handler)
-    bpy.app.handlers.depsgraph_update_post.append(depsgraph_update)
-
+    handlers.register_handlers()
 
 def unregister():
-    bpy.types.TOPBAR_MT_editor_menus.remove(draw_popover)
+    try:
+        bpy.types.TOPBAR_MT_editor_menus.remove(draw_popover)
+    except (AttributeError, ValueError):
+        pass
 
-    bpy.app.handlers.load_post.remove(load_handler)
-    bpy.app.handlers.depsgraph_update_post.remove(depsgraph_update)
+    try:
+        bpy.types.VIEW3D_MT_object_context_menu.remove(draw_object_context_menu)
+    except (AttributeError, ValueError):
+        pass
+
+    handlers.unregister_handlers()
+    unregister_scene_properties()
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
+
 
 
 if __name__ == "__main__":
