@@ -1,7 +1,7 @@
 import bpy  # type: ignore
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty  # type: ignore
 
-from . import handlers, updater, utils   # <--- новый импорт
+from . import handlers, updater, utils 
 from .utils import OBJECT_OT_duplicate_clean_join, OBJECT_OT_rename_uv
 from .export import *
 from .ui import *
@@ -11,7 +11,7 @@ bl_info = {
     "name": "DF FN Tools",
     "description": "DF FN Tools",
     "author": "Aloija, GPT",
-    "version": (1, 6, 3),
+    "version": (1, 7, 0),
     "blender": (4, 4, 0),
     "category": "Object"
 }
@@ -30,7 +30,7 @@ class DFFN_AddonPreferences(bpy.types.AddonPreferences):
 
 
 
-# все регистрируемые классы 
+# все регистрируемые классы  
 classes = (
     DFT_PT_export_panel,
     Exportfbx,
