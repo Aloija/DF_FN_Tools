@@ -30,7 +30,7 @@ class DFFN_AddonPreferences(bpy.types.AddonPreferences):
 
 
 
-# все регистрируемые классы 
+# все регистрируемые классы  
 classes = (
     DFT_PT_export_panel,
     Exportfbx,
