@@ -27,6 +27,9 @@ def create_dir(path):
         pass
 
 
+def collect_related_meshes(selected):
+    pass
+
 # Main export function
 def ExportMain(selected):
     obj_dict = {}
@@ -57,7 +60,7 @@ def ExportMeshes(obj_dict, path):
     # создаем подпапку для LOD1–LOD3
     lods_dir = os.path.join(path, "LODs")
     create_dir(lods_dir)
-    nanite_dir = os.path.join(path, "Nanite")
+    nanite_dir = os.path.join(path, "NITE")
     create_dir(nanite_dir)
 
     for key in obj_dict:
@@ -112,21 +115,57 @@ class Exportfbx(bpy.types.Operator):
 
         valid_msg = None
         obj_for_export = []
+        
+        # Для отслеживания скрытых связанных мешей
+        related_hidden_states = {}
+        newly_found_objects = []
 
         hidden_selection = is_hidden_selection()
-
         unhide_selected(hidden_selection)
         orig_selection = save_selected()
+
+        # Автоматический поиск связанных мешей
+        if scene.export_with_related:
+            from .utils import find_related_meshes, ensure_objects_visible
+        
+            expanded_selection = find_related_meshes(orig_selection, bpy.data.objects)
+        
+            # Определяем какие объекты были добавлены
+            orig_names = {obj.name for obj in orig_selection}
+            newly_found_objects = [
+                obj for obj in expanded_selection 
+                if obj.name not in orig_names
+            ]
+            
+            # Показываем скрытые связанные меши
+            if newly_found_objects:
+                related_hidden_states = ensure_objects_visible(newly_found_objects)
+        
+            additional_count = len(newly_found_objects)
+            if additional_count > 0:
+                self.report({'INFO'}, f"Found {additional_count} additional related mesh(es)")
+        
+            orig_selection = expanded_selection
+
         # if name is valid, append to export array
         for obj in orig_selection:
             valid_msg = name_validation(obj)
             if valid_msg is not None:
                 self.report({'WARNING'}, str(valid_msg))
 
+        # Выделяем ВСЕ объекты перед дублированием
+        bpy.ops.object.select_all(action='DESELECT')
+        for obj in orig_selection:
+            obj.select_set(True)
+
+        # Устанавливаем активный объект
+        if orig_selection:
+            view_layer.objects.active = orig_selection[0].bl_object
+
         bpy.ops.object.duplicate()
         dublicate_selection = save_selected()
 
-        # Secect\Create material
+        # Select\Create material
         if scene.apply_material:
             material_name = scene.material_name
             material = create_material(material_name)
@@ -146,7 +185,6 @@ class Exportfbx(bpy.types.Operator):
                 apply_single_material(obj, material)
             if scene.reassigne_materials:
                 reassign_materials(obj, context)
-                pass
 
         # if name is valid, append to export array
         for obj in dublicate_selection:
@@ -158,10 +196,8 @@ class Exportfbx(bpy.types.Operator):
 
         exported_names = ExportMain(obj_for_export)
 
-        if exported_names != []:
+        if exported_names:
             self.report({'INFO'}, str(", ").join(exported_names) + " are exported")
-        else:
-            None
 
         # Delete doubles
         for obj in dublicate_selection:
@@ -175,6 +211,11 @@ class Exportfbx(bpy.types.Operator):
         for obj in orig_selection:
             obj.select_set(True)
         hide_back(hidden_selection)
+
+        # === ВОССТАНАВЛИВАЕМ ВИДИМОСТЬ СВЯЗАННЫХ МЕШЕЙ ===
+        if related_hidden_states and newly_found_objects:
+            from .utils import restore_objects_visibility
+            restore_objects_visibility(newly_found_objects, related_hidden_states)
 
         orig_selection = None
         dublicate_selection = None

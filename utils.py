@@ -1,3 +1,4 @@
+from typing import Optional
 import bpy # type: ignore
 import re
 import bmesh # type: ignore
@@ -9,6 +10,297 @@ from .mesh_object_classes import MeshObject
 validate_list = ["LOD0", "LOD1", "LOD2", "LOD3", "UCX"]
 
 MATERIAL_REASSIGN_SLOT_COUNT = 4
+
+
+def get_object_collections(obj) -> list:
+    """
+    Возвращает все коллекции, в которых находится объект.
+    """
+    bl_obj = obj.bl_object if hasattr(obj, 'bl_object') else obj
+    return list(bl_obj.users_collection)
+
+
+def get_layer_collection_recursive(layer_collection, collection_name: str):
+    """
+    Рекурсивно ищет LayerCollection по имени коллекции.
+    
+    LayerCollection нужен для управления exclude и hide_viewport во view layer.
+    """
+    if layer_collection.collection.name == collection_name:
+        return layer_collection
+    
+    for child in layer_collection.children:
+        result = get_layer_collection_recursive(child, collection_name)
+        if result:
+            return result
+    
+    return None
+
+
+def get_parent_collections(collection, all_collections=None) -> list:
+    """
+    Находит все родительские коллекции для данной коллекции.
+    
+    Returns:
+        Список родительских коллекций от непосредственного родителя до корня
+    """
+    if all_collections is None:
+        all_collections = bpy.data.collections
+    
+    parents = []
+    
+    for potential_parent in all_collections:
+        if collection.name in [c.name for c in potential_parent.children]:
+            parents.append(potential_parent)
+            # Рекурсивно ищем родителей родителя
+            parents.extend(get_parent_collections(potential_parent, all_collections))
+            break
+    
+    return parents
+
+
+def ensure_objects_visible(objects: list) -> dict:
+    """
+    Временно показывает объекты и их коллекции для экспорта.
+    
+    Обрабатывает:
+    - Скрытие объекта (hide_viewport, hide_get, hide_select)
+    - Скрытие коллекции (hide_viewport)
+    - Исключение коллекции из view layer (exclude)
+    - Скрытие коллекции в outliner (layer_collection.hide_viewport)
+    
+    Args:
+        objects: Список MeshObject'ов
+        
+    Returns:
+        Словарь состояний для последующего восстановления
+    """
+    view_layer = bpy.context.view_layer
+    root_layer_collection = view_layer.layer_collection
+    
+    original_states = {
+        'objects': {},
+        'collections': {},
+        'layer_collections': {}
+    }
+    
+    # Собираем все коллекции, которые нужно проверить
+    collections_to_process = set()
+    
+    for obj in objects:
+        bl_obj = obj.bl_object if hasattr(obj, 'bl_object') else obj
+        
+        # === СОХРАНЯЕМ И МЕНЯЕМ СОСТОЯНИЕ ОБЪЕКТА ===
+        original_states['objects'][bl_obj.name] = {
+            'hide_viewport': bl_obj.hide_viewport,
+            'hide_get': bl_obj.hide_get(),
+            'hide_select': bl_obj.hide_select,
+        }
+        
+        bl_obj.hide_viewport = False
+        bl_obj.hide_set(False)
+        bl_obj.hide_select = False
+        
+        # Собираем коллекции объекта и их родителей
+        for collection in bl_obj.users_collection:
+            collections_to_process.add(collection)
+            # Добавляем родительские коллекции
+            for parent in get_parent_collections(collection):
+                collections_to_process.add(parent)
+    
+    # === ОБРАБАТЫВАЕМ КОЛЛЕКЦИИ ===
+    for collection in collections_to_process:
+        coll_name = collection.name
+        
+        # Сохраняем состояние коллекции
+        if coll_name not in original_states['collections']:
+            original_states['collections'][coll_name] = {
+                'hide_viewport': collection.hide_viewport,
+            }
+            # Показываем коллекцию
+            collection.hide_viewport = False
+        
+        # Находим LayerCollection для этой коллекции
+        layer_coll = get_layer_collection_recursive(root_layer_collection, coll_name)
+        
+        if layer_coll and coll_name not in original_states['layer_collections']:
+            original_states['layer_collections'][coll_name] = {
+                'exclude': layer_coll.exclude,
+                'hide_viewport': layer_coll.hide_viewport,
+            }
+            # Включаем в view layer и показываем
+            layer_coll.exclude = False
+            layer_coll.hide_viewport = False
+    
+    return original_states
+
+
+def restore_objects_visibility(objects: list, original_states: dict):
+    """
+    Восстанавливает исходное состояние видимости объектов и коллекций.
+    
+    Args:
+        objects: Список MeshObject'ов
+        original_states: Словарь состояний от ensure_objects_visible()
+    """
+    view_layer = bpy.context.view_layer
+    root_layer_collection = view_layer.layer_collection
+    
+    # === ВОССТАНАВЛИВАЕМ ОБЪЕКТЫ ===
+    for obj in objects:
+        bl_obj = obj.bl_object if hasattr(obj, 'bl_object') else obj
+        
+        if bl_obj.name in original_states.get('objects', {}):
+            state = original_states['objects'][bl_obj.name]
+            bl_obj.hide_viewport = state['hide_viewport']
+            bl_obj.hide_set(state['hide_get'])
+            bl_obj.hide_select = state['hide_select']
+    
+    # === ВОССТАНАВЛИВАЕМ LAYER COLLECTIONS (сначала, до коллекций) ===
+    for coll_name, state in original_states.get('layer_collections', {}).items():
+        layer_coll = get_layer_collection_recursive(root_layer_collection, coll_name)
+        if layer_coll:
+            layer_coll.exclude = state['exclude']
+            layer_coll.hide_viewport = state['hide_viewport']
+    
+    # === ВОССТАНАВЛИВАЕМ КОЛЛЕКЦИИ ===
+    for coll_name, state in original_states.get('collections', {}).items():
+        collection = bpy.data.collections.get(coll_name)
+        if collection:
+            collection.hide_viewport = state['hide_viewport']
+
+
+def get_base_name_from_mesh(mesh_name: str) -> Optional[str]:
+    """
+    Извлекает базовое имя из имени меша любого типа.
+    
+    Примеры:
+        'LOD0_SM_MyMesh' -> 'MyMesh'
+        'LOD1_SM_Chair' -> 'Chair'
+        'LOD2_SM_Table' -> 'Table'
+        'SM_NITE_Rock' -> 'Rock'
+        'UCX_LOD0_SM_Door_01' -> 'Door'
+    """
+    name_parts = mesh_name.split("_")
+    if len(name_parts) < 2:
+        return None
+    
+    prefix = name_parts[0]
+    second_part = name_parts[1] if len(name_parts) > 1 else None
+    
+    # Случай 1: LOD0_SM_BaseName, LOD1_SM_BaseName, LOD2_SM_BaseName, LOD3_SM_BaseName
+    if prefix in ["LOD0", "LOD1", "LOD2", "LOD3"]:
+        remaining = name_parts[1:]
+        if remaining and remaining[0] == "SM":
+            return "_".join(remaining[1:]) if len(remaining) > 1 else None
+        else:
+            return "_".join(remaining) if remaining else None
+    
+    # Случай 2: SM_NITE_BaseName
+    elif prefix == "SM" and second_part == "NITE":
+        return "_".join(name_parts[2:]) if len(name_parts) > 2 else None
+    
+    # Случай 3: UCX_LOD0_SM_BaseName_01
+    elif prefix == "UCX":
+        if len(name_parts) >= 3 and name_parts[1] == "LOD0":
+            remaining = name_parts[2:]
+            if remaining and remaining[0] == "SM":
+                base_parts = remaining[1:]
+                # Убираем числовой суффикс в конце
+                if base_parts and base_parts[-1].isdigit():
+                    base_parts = base_parts[:-1]
+                return "_".join(base_parts) if base_parts else None
+        return None
+    
+    return None
+
+
+def get_valid_search_space(selected_mesh_objs: list, all_scene_objects) -> list:
+    """
+    Определяет пространство поиска для связанных мешей.
+    
+    ВАЖНО: Ищет во ВСЕХ объектах, включая скрытые коллекции!
+    """
+    # export_collection = bpy.data.collections.get("Export")
+    # if export_collection:
+    #     # all_objects включает объекты из вложенных коллекций
+    #     # независимо от видимости коллекции
+    #     result = [obj for obj in export_collection.all_objects if obj.type == 'MESH']
+    #     return result
+    
+    # Умная фильтрация по базовым именам
+    base_names_to_search = set()
+    
+    for mesh_obj in selected_mesh_objs:
+        base_name = get_base_name_from_mesh(mesh_obj.name)
+        if base_name:
+            base_names_to_search.add(base_name)
+    
+    if not base_names_to_search:
+        return []
+    
+    # ВАЖНО: Используем bpy.data.objects - это ВСЕ объекты,
+    # включая те что в скрытых коллекциях
+    valid_objects = []
+    for obj in bpy.data.objects:
+        if obj.type != 'MESH':
+            continue
+        
+        base_name = get_base_name_from_mesh(obj.name)
+        if base_name in base_names_to_search:
+            valid_objects.append(obj)
+    
+    return valid_objects
+
+
+def find_related_meshes(selected_mesh_objs: list, all_scene_objects) -> list:
+    """
+    Находит все связанные LOD'ы и UCX для выбранных мешей.
+    
+    Использует умную фильтрацию для игнорирования мусорных мешей.
+    
+    Args:
+        selected_mesh_objs: Список выбранных MeshObject'ов
+        all_scene_objects: Все объекты сцены (bpy.data.objects)
+    
+    Returns:
+        Список всех MeshObject'ов включая выбранные и найденные связанные
+    """
+    from .mesh_object_classes import MeshObject
+    
+    # Получаем отфильтрованное пространство поиска
+    search_space = get_valid_search_space(selected_mesh_objs, all_scene_objects)
+    
+    result_objects = []
+    processed_names = set()
+    base_names_to_find = set()
+    
+    # ПЕРВЫЙ ПРОХОД: Определяем базовые имена для поиска
+    for mesh_obj in selected_mesh_objs:
+        result_objects.append(mesh_obj)
+        processed_names.add(mesh_obj.name)
+        
+        base_name = get_base_name_from_mesh(mesh_obj.name)
+        if base_name:
+            base_names_to_find.add(base_name)
+    
+    # ВТОРОЙ ПРОХОД: Ищем в отфильтрованном пространстве
+    for obj in search_space:
+        obj_name = obj.name
+        
+        # Пропускаем уже обработанные
+        if obj_name in processed_names:
+            continue
+        
+        # Проверяем совпадение базового имени
+        base_name = get_base_name_from_mesh(obj_name)
+        if base_name and base_name in base_names_to_find:
+            mesh_obj = MeshObject(obj)
+            result_objects.append(mesh_obj)
+            processed_names.add(obj_name)
+    
+    return result_objects
+    
 
 def name_validation(mesh_obj: MeshObject):
     valid_msg = None

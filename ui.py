@@ -51,6 +51,13 @@ class DFT_PT_export_panel(bpy.types.Panel):
         default=False)
     
 
+    bpy.types.Scene.export_with_related = bpy.props.BoolProperty(
+        name="Export with LODs and UCX",
+        description="Export with LODs and UCX", 
+        default=True)
+    
+
+
 
     def draw(self, context):
         scene = context.scene
@@ -63,6 +70,8 @@ class DFT_PT_export_panel(bpy.types.Panel):
         col = self.layout.column()
         col.label(text="Settings:")
         col.prop(scene, 'reset_tramsforms')
+        col.prop(scene, 'export_with_related')
+
         col.prop(scene, 'apply_material')
         col.prop(scene, 'material_name')
 
@@ -97,9 +106,9 @@ def draw_popover(self, context):
     if obj and obj.type == 'MESH':
         if not any(p.use_smooth for p in obj.data.polygons):
             row.label(text="Set Shade Smooth for correct vertex count", icon='ERROR')
-        elif count >= 0:
+        elif count is not None and count >= 0:
             row.label(text=f" Vertex Count: {count}")
-    elif count >= 0:
+    elif count is not None and count >= 0:
         row.label(text=f" Vertex Count: {count}")
     else:
         row.label(text="Not a mesh")

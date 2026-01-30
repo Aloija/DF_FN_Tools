@@ -1,7 +1,7 @@
 import bpy  # type: ignore
 from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty  # type: ignore
 
-from . import handlers, updater, utils   # <--- новый импорт
+from . import handlers, updater, utils 
 from .utils import OBJECT_OT_duplicate_clean_join, OBJECT_OT_rename_uv
 from .export import *
 from .ui import *
