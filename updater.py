@@ -43,9 +43,10 @@ def _reload_addon(pkg_name: str):
 
     importlib.invalidate_caches()
 
-    enabled, error_message = addon_utils.enable(pkg_name, default_set=False, handle_error=None)
-    if not enabled:
-        raise RuntimeError(error_message or f"Failed to reload add-on {pkg_name}")
+    try:
+        addon_utils.enable(pkg_name, default_set=False, handle_error=None)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to reload add-on {pkg_name}: {exc}") from exc
 
 class DFT_OT_update_from_github(bpy.types.Operator):
     """Скачать и установить последнюю версию из main ветки"""
