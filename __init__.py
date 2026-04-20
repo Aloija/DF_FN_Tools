@@ -5,6 +5,7 @@ from . import handlers, updater, utils
 from .utils import OBJECT_OT_duplicate_clean_join, OBJECT_OT_rename_uv
 from .export import *
 from .ui import *
+from .ui import _register_bad_triangles_props, _unregister_bad_triangles_props
 
 
 bl_info = {
@@ -39,6 +40,13 @@ classes = (
     OBJECT_OT_rename_uv,
     DFFN_AddonPreferences,           # <--- добавлено
     updater.DFT_OT_update_from_github,  # <--- добавлено
+)
+
+BAD_TRIANGLES_CLASSES = (
+    DFT_OT_analyze_triangles,
+    DFT_OT_clear_triangle_colors,
+    DFT_OT_select_bad_triangles,
+    DFT_PT_bad_triangles_panel,
 )
 
 
@@ -94,6 +102,10 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
 
+    _register_bad_triangles_props()
+    for cls in BAD_TRIANGLES_CLASSES:
+        bpy.utils.register_class(cls)
+
     register_scene_properties()
     bpy.types.TOPBAR_MT_editor_menus.append(draw_popover)
     bpy.types.VIEW3D_MT_object_context_menu.append(draw_object_context_menu)
@@ -117,6 +129,9 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
+    for cls in reversed(BAD_TRIANGLES_CLASSES):
+        bpy.utils.unregister_class(cls)
+    _unregister_bad_triangles_props()
 
 
 if __name__ == "__main__":
