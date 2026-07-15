@@ -115,37 +115,27 @@ class Exportfbx(bpy.types.Operator):
 
         valid_msg = None
         obj_for_export = []
-        
-        # Для отслеживания скрытых связанных мешей
-        related_hidden_states = {}
-        newly_found_objects = []
 
-        hidden_selection = is_hidden_selection()
-        unhide_selected(hidden_selection)
-        orig_selection = save_selected()
+        # Выделение вьюпорта + выделение Outliner, если он открыт
+        orig_selection = collect_export_selection()
 
-        # Автоматический поиск связанных мешей
+        if not orig_selection:
+            self.report({'WARNING'}, "Nothing selected")
+            return {'CANCELLED'}
+
+        # Автоматический поиск связанных мешей по имени (LOD'ы, UCX).
+        # Ищет в bpy.data.objects, поэтому находит и скрытые.
         if scene.export_with_related:
-            from .utils import find_related_meshes, ensure_objects_visible
-        
             expanded_selection = find_related_meshes(orig_selection, bpy.data.objects)
-        
-            # Определяем какие объекты были добавлены
-            orig_names = {obj.name for obj in orig_selection}
-            newly_found_objects = [
-                obj for obj in expanded_selection 
-                if obj.name not in orig_names
-            ]
-            
-            # Показываем скрытые связанные меши
-            if newly_found_objects:
-                related_hidden_states = ensure_objects_visible(newly_found_objects)
-        
-            additional_count = len(newly_found_objects)
+
+            additional_count = len(expanded_selection) - len(orig_selection)
             if additional_count > 0:
                 self.report({'INFO'}, f"Found {additional_count} additional related mesh(es)")
-        
+
             orig_selection = expanded_selection
+
+        # Раскрываем всё, что экспортируем: объекты, их коллекции и layer collections
+        visibility_states = ensure_objects_visible(orig_selection)
 
         # if name is valid, append to export array
         for obj in orig_selection:
@@ -215,12 +205,9 @@ class Exportfbx(bpy.types.Operator):
         view_layer.objects.active = obj_active
         for obj in orig_selection:
             obj.select_set(True)
-        hide_back(hidden_selection)
 
-        # === ВОССТАНАВЛИВАЕМ ВИДИМОСТЬ СВЯЗАННЫХ МЕШЕЙ ===
-        if related_hidden_states and newly_found_objects:
-            from .utils import restore_objects_visibility
-            restore_objects_visibility(newly_found_objects, related_hidden_states)
+        # Восстанавливаем видимость последней: скрытый объект не выделяется
+        restore_objects_visibility(orig_selection, visibility_states)
 
         orig_selection = None
         dublicate_selection = None

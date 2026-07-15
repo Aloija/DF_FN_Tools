@@ -474,30 +474,64 @@ def get_id_type(obj):
     return obj.bl_rna.identifier.upper()
 
 
-def is_hidden_selection():
-    hidden_selection = []
-    scr = bpy.context.screen
-    areas = [area for area in scr.areas if area.type == 'OUTLINER']
-    regions = [region for region in areas[0].regions if region.type == 'WINDOW']
-
-    with bpy.context.temp_override(area=areas[0], region=regions[0], screen=scr):
-        for obj in bpy.context.selected_ids:
-            id_type = get_id_type(obj)
-            if id_type == "OBJECT":
-                if obj.visible_get() == False:
-                    hidden_selection.append(obj)
-    return hidden_selection
+def find_outliner_context():
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        for area in screen.areas:
+            if area.type != 'OUTLINER':
+                continue
+            for region in area.regions:
+                if region.type == 'WINDOW':
+                    return window, screen, area, region
+    return None
 
 
-def unhide_selected(hidden_selection):
-    for obj in hidden_selection:
-        obj.hide_set(False)
-        obj.select_set(True)
+def get_outliner_selected_objects() -> list:
+    """
+    Возвращает bl_object'ы, подсвеченные в Outliner, включая скрытые.
+
+    Outliner хранит выделение в своём дереве (TSE_SELECTED), отдельно от
+    Base.flag view layer'а. Скрытый объект не BASE_SELECTABLE, поэтому во
+    вьюпорте выделен быть не может, а в Outliner — может. Это единственный
+    источник такой информации.
+
+    Нет открытого Outliner — возвращает пустой список.
+    """
+    outliner = find_outliner_context()
+    if outliner is None:
+        return []
+
+    window, screen, area, region = outliner
+    selected = []
+    with bpy.context.temp_override(window=window, screen=screen, area=area, region=region):
+        for bl_obj in bpy.context.selected_ids:
+            if get_id_type(bl_obj) == "OBJECT":
+                selected.append(bl_obj)
+    return selected
 
 
-def hide_back(hidden_selection):
-    for obj in hidden_selection:
-        obj.hide_set(True)
+def collect_export_selection() -> list:
+    """
+    Собирает объекты для экспорта: выделение вьюпорта плюс выделение Outliner.
+
+    Вьюпорт даёт только видимые объекты (context.selected_objects фильтрует по
+    BASE_VISIBLE). Outliner добавляет скрытые, если он открыт. Дедуп по имени,
+    порядок вьюпорта сохраняется — от него зависит выбор активного объекта.
+    """
+    selected = []
+    seen = set()
+
+    for bl_obj in bpy.context.selected_objects:
+        if bl_obj.name not in seen:
+            seen.add(bl_obj.name)
+            selected.append(MeshObject(bl_obj))
+
+    for bl_obj in get_outliner_selected_objects():
+        if bl_obj.name not in seen:
+            seen.add(bl_obj.name)
+            selected.append(MeshObject(bl_obj))
+
+    return selected
 
 
 def get_materials(self, context):
