@@ -12,7 +12,7 @@ bl_info = {
     "name": "DF FN Tools",
     "description": "DF FN Tools",
     "author": "Aloija, GPT",
-    "version": (1, 8, 0),
+    "version": (1, 9, 0),
     "blender": (4, 4, 0),
     "category": "Object"
 }

@@ -367,12 +367,33 @@ def reset_transforms(mesh_obj: MeshObject):
     bl_obj.scale = scale
 
 
+def is_ucx(name: str) -> bool:
+    return name.split("_")[0] == "UCX"
+
+
+def strip_ucx_data(mesh_obj: MeshObject):
+    """
+    Снимает материалы и UV с коллизии.
+
+    UCX в движке не рендерится, материалы и UV на нем — мусор в .fbx.
+    """
+    mesh_data = mesh_obj.mesh
+    if not mesh_data:
+        return
+
+    mesh_data.materials.clear()
+
+    uv_layers = mesh_data.uv_layers
+    while len(uv_layers) > 0:
+        uv_layers.remove(uv_layers[0])
+
+
 def create_material(material_name):
     mat = bpy.data.materials.get(material_name)
     if mat is None:
         mat = bpy.data.materials.new(name=material_name)
     return mat
-    
+
 
 def apply_single_material(mesh_obj: MeshObject, material):
     mesh_data = mesh_obj.mesh
@@ -664,6 +685,8 @@ class OBJECT_OT_duplicate_clean_join(bpy.types.Operator):
 def rename_uv():
     context = bpy.context
     for obj in [o for o in context.selected_objects if o.type == 'MESH' and hasattr(o, 'data') and o.data]:
+        if is_ucx(obj.name):
+            continue
         mesh = obj.data
         uv_layers = mesh.uv_layers
         # Ensure at least one UV layer exists

@@ -162,7 +162,9 @@ class Exportfbx(bpy.types.Operator):
         if orig_selection:
             view_layer.objects.active = orig_selection[0].bl_object
 
-        bpy.ops.object.duplicate()
+        # linked=False: иначе дубликат шарит mesh data с оригиналом
+        # и правки материалов/UV уходят в исходный меш сцены
+        bpy.ops.object.duplicate(linked=False)
         dublicate_selection = save_selected()
 
         # Select\Create material
@@ -181,6 +183,9 @@ class Exportfbx(bpy.types.Operator):
             obj_init(obj)
             if scene.reset_tramsforms:
                 reset_transforms(obj)
+            if obj.lod == "UCX":
+                strip_ucx_data(obj)
+                continue
             if scene.apply_material:
                 apply_single_material(obj, material)
             if scene.reassigne_materials:
