@@ -521,7 +521,9 @@ def draw_popover(self, context):
 
     # Vertex count
     obj = context.view_layer.objects.active
-    count = context.scene.get("split_vertex_count", None)
+    # Blender 5.0 вынес bpy.props-свойства из контейнера Custom Properties,
+    # scene.get() до них больше не достаёт. Атрибут работает во всех версиях.
+    count = getattr(context.scene, "split_vertex_count", -1)
 
     if obj and obj.type == 'MESH':
         if not any(p.use_smooth for p in obj.data.polygons):

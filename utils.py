@@ -550,6 +550,23 @@ def get_materials(self, context):
     return [(mat.name, mat.name, "") for mat in bpy.data.materials]
 
 
+def get_corner_color_layers(mesh) -> list:
+    """
+    Слои цвета по углам грани — то, что раньше отдавал mesh.vertex_colors.
+
+    Blender 5.0 может не иметь legacy-коллекции vertex_colors. Fallback на
+    color_attributes отбирает ровно её содержимое: домен CORNER, тип BYTE_COLOR.
+    """
+    legacy = getattr(mesh, "vertex_colors", None)
+    if legacy is not None:
+        return list(legacy)
+
+    return [
+        attr for attr in mesh.color_attributes
+        if attr.domain == 'CORNER' and attr.data_type == 'BYTE_COLOR'
+    ]
+
+
 def get_split_vertex_count():
     depsgraph = bpy.context.evaluated_depsgraph_get()
     total_vertices = 0
@@ -584,7 +601,7 @@ def get_split_vertex_count():
         mesh.calc_loop_triangles()
 
         uv_layers = mesh.uv_layers
-        color_layers = mesh.vertex_colors
+        color_layers = get_corner_color_layers(mesh)
 
         # Если есть UV, считаем тангенты на уже триангулированном меше
         if uv_layers:
