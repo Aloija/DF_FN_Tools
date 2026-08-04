@@ -55,6 +55,8 @@ def ExportMain(selected):
 
 
 def ExportMeshes(obj_dict, path):
+    scene = bpy.context.scene
+
     bpy.ops.object.select_all(action='DESELECT')
 
     # создаем подпапку для LOD1–LOD3
@@ -81,24 +83,18 @@ def ExportMeshes(obj_dict, path):
         for mesh in meshes:
             mesh.select_set(True)
 
-        if bpy.app.version >= (4, 2):
-            bpy.ops.export_scene.fbx(
-                filepath=final_path + ".fbx",
-                use_selection=True,
-                mesh_smooth_type="FACE",
-                bake_space_transform=False,
-                axis_forward="Y",
-                axis_up="Z",
-                bake_anim=False
-            )
-        else:
-            bpy.ops.export_scene.fbx(
-                filepath=final_path + ".fbx",
-                use_selection=True,
-                mesh_smooth_type="FACE",
-                bake_space_transform=False,
-                bake_anim=False
-            )
+        # bake_space_transform запекает юнит-скейл в вершины, а не в трансформ
+        # объекта: меш приезжает в Maya в сантиметрах с единичным скейлом
+        # независимо от Unit Scale сцены.
+        bpy.ops.export_scene.fbx(
+            filepath=final_path + ".fbx",
+            use_selection=True,
+            mesh_smooth_type="FACE",
+            bake_space_transform=scene.export_auto_scale,
+            axis_forward="Y",
+            axis_up="Z",
+            bake_anim=False
+        )
 
         bpy.ops.object.select_all(action='DESELECT')
 

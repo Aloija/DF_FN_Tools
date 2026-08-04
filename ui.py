@@ -11,6 +11,7 @@ from .bad_triangles import (
     has_color_layer,
     select_bad_triangles,
 )
+from .utils import get_fbx_unit_scale_factor
 
 
 # ---------------------------------------------------------------------------
@@ -452,6 +453,15 @@ class DFT_PT_export_panel(bpy.types.Panel):
         description="Export with LODs and UCX",
         default=True)
 
+    bpy.types.Scene.export_auto_scale = bpy.props.BoolProperty(
+        name="Auto scale",
+        description=(
+            "Bake the unit scale into the geometry instead of the object transform. "
+            "Meshes come into Maya in centimeters with frozen transforms, "
+            "no matter what the scene unit scale is"
+        ),
+        default=True)
+
     def draw(self, context):
         scene = context.scene
         layout = self.layout
@@ -464,6 +474,12 @@ class DFT_PT_export_panel(bpy.types.Panel):
         col.label(text="Settings:")
         col.prop(scene, 'reset_tramsforms')
         col.prop(scene, 'export_with_related')
+
+        col.prop(scene, 'export_auto_scale')
+        if scene.export_auto_scale:
+            factor = get_fbx_unit_scale_factor(scene)
+            row_scale = col.row()
+            row_scale.label(text=f"Mesh scale on export: x{factor:g}", icon='EMPTY_ARROWS')
 
         col.prop(scene, 'apply_material')
         col.prop(scene, 'material_name')

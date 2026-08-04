@@ -12,6 +12,18 @@ validate_list = ["LOD0", "LOD1", "LOD2", "LOD3", "UCX"]
 MATERIAL_REASSIGN_SLOT_COUNT = 4
 
 
+def get_fbx_unit_scale_factor(scene) -> float:
+    """
+    Множитель, на который FBX-экспортёр масштабирует сцену при записи файла.
+
+    Повторяет units_blender_to_fbx_factor() из io_scene_fbx/fbx_utils.py:
+    единица FBX — сантиметр, единица Blender — метр.
+    """
+    if scene.unit_settings.system == 'NONE':
+        return 100.0
+    return 100.0 * scene.unit_settings.scale_length
+
+
 def get_object_collections(obj) -> list:
     """
     Возвращает все коллекции, в которых находится объект.
