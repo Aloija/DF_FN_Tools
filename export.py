@@ -31,22 +31,25 @@ def collect_related_meshes(selected):
     pass
 
 # Main export function
+def get_export_group_name(mesh_obj, combine_lods, lod0_export_names):
+    if combine_lods and mesh_obj.lod != "LOD0" and is_lod_name(mesh_obj.lod):
+        lod0_name = mesh_obj.exportname.rsplit("_", 1)[0]
+        if lod0_name in lod0_export_names:
+            return lod0_name
+    return mesh_obj.exportname
+
+
 def ExportMain(selected):
     obj_dict = {}
     exported_names = []
+    combine_lods = bpy.context.scene.export_lods_with_lod0
+    lod0_export_names = {obj.exportname for obj in selected if obj.lod == "LOD0"}
 
     for obj in selected:
-        obj_dict[obj.exportname] = []
         exported_names.append(obj.name)
-    for obj in selected:
-        if obj.lod == "NITE":
-            obj_dict[obj.exportname].append(obj)
-        if obj.lod == "LOD0":
-            obj_dict[obj.exportname].append(obj)
-        if obj.lod in ["LOD1", "LOD2", "LOD3"]:
-            obj_dict[obj.exportname].append(obj)
-        if obj.lod == "UCX":
-            obj_dict[obj.exportname].append(obj)
+        if obj.lod in ("NITE", "UCX") or is_lod_name(obj.lod):
+            group_name = get_export_group_name(obj, combine_lods, lod0_export_names)
+            obj_dict.setdefault(group_name, []).append(obj)
 
     path = GetExportPath()
     ExportMeshes(obj_dict, path)
@@ -59,7 +62,7 @@ def ExportMeshes(obj_dict, path):
 
     bpy.ops.object.select_all(action='DESELECT')
 
-    # создаем подпапку для LOD1–LOD3
+    # создаем подпапку для дополнительных LOD
     lods_dir = os.path.join(path, "LODs")
     create_dir(lods_dir)
     nanite_dir = os.path.join(path, "NITE")
@@ -71,8 +74,10 @@ def ExportMeshes(obj_dict, path):
         # определяем тип LOD по первому элементу группы
         lod_type = meshes[0].lod if meshes else None
 
-        # все LOD1–LOD3 уезжают в подпапку LODs
-        if lod_type in ["LOD1", "LOD2", "LOD3"]:
+        # Группа с LOD0 всегда экспортируется как основной FBX.
+        if any(mesh.lod == "LOD0" for mesh in meshes):
+            target_dir = path
+        elif is_lod_name(lod_type):
             target_dir = lods_dir
         elif lod_type == "NITE":
             target_dir = nanite_dir

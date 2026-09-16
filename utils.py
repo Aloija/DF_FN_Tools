@@ -3,11 +3,7 @@ import bpy # type: ignore
 import re
 import bmesh # type: ignore
 
-from .mesh_object_classes import MeshObject
-
-
-# Name validation
-validate_list = ["LOD0", "LOD1", "LOD2", "LOD3", "UCX"]
+from .mesh_object_classes import MeshObject, is_lod_name
 
 MATERIAL_REASSIGN_SLOT_COUNT = 4
 
@@ -200,8 +196,8 @@ def get_base_name_from_mesh(mesh_name: str) -> Optional[str]:
     prefix = name_parts[0]
     second_part = name_parts[1] if len(name_parts) > 1 else None
     
-    # Случай 1: LOD0_SM_BaseName, LOD1_SM_BaseName, LOD2_SM_BaseName, LOD3_SM_BaseName
-    if prefix in ["LOD0", "LOD1", "LOD2", "LOD3"]:
+    # Случай 1: LOD0_SM_BaseName, LOD1_SM_BaseName, LOD4_SM_BaseName...
+    if is_lod_name(prefix):
         remaining = name_parts[1:]
         if remaining and remaining[0] == "SM":
             return "_".join(remaining[1:]) if len(remaining) > 1 else None
@@ -330,26 +326,25 @@ def name_validation(mesh_obj: MeshObject):
         return valid_msg
     
 
-    if name[0] in validate_list:
-        if name[0] == "UCX":
-            if name [1] != "LOD0":
-                valid_msg = ("add 'LOD0' to the ", mesh_obj.name, " name")
-                return valid_msg
-            try:
-                test = int(name[-1])
-                return valid_msg
-            except ValueError:
-                valid_msg = (mesh_obj.name + " should be enumerated")
-                return valid_msg
-        else:
+    if name[0] == "UCX":
+        if name [1] != "LOD0":
+            valid_msg = ("add 'LOD0' to the ", mesh_obj.name, " name")
             return valid_msg
-    else:
-        has_second_part = len(name) > 1
-        if has_second_part and name[1] == "NITE":
+        try:
+            test = int(name[-1])
             return valid_msg
-        else: 
-            valid_msg = (mesh_obj.name + " has incorrect prefix: " + str(name[0]))
+        except ValueError:
+            valid_msg = (mesh_obj.name + " should be enumerated")
             return valid_msg
+    if is_lod_name(name[0]):
+        return valid_msg
+
+    has_second_part = len(name) > 1
+    if has_second_part and name[1] == "NITE":
+        return valid_msg
+
+    valid_msg = (mesh_obj.name + " has incorrect prefix: " + str(name[0]))
+    return valid_msg
     
 
 def rename_origs(mesh_obj: MeshObject):

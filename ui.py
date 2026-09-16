@@ -453,6 +453,11 @@ class DFT_PT_export_panel(bpy.types.Panel):
         description="Export with LODs and UCX",
         default=True)
 
+    bpy.types.Scene.export_lods_with_lod0 = bpy.props.BoolProperty(
+        name="Export LODs with LOD0",
+        description="Export LOD1 and higher in the same FBX file as the matching LOD0",
+        default=False)
+
     bpy.types.Scene.export_auto_scale = bpy.props.BoolProperty(
         name="Auto scale",
         description=(
@@ -474,6 +479,7 @@ class DFT_PT_export_panel(bpy.types.Panel):
         col.label(text="Settings:")
         col.prop(scene, 'reset_tramsforms')
         col.prop(scene, 'export_with_related')
+        col.prop(scene, 'export_lods_with_lod0')
 
         col.prop(scene, 'export_auto_scale')
         if scene.export_auto_scale:

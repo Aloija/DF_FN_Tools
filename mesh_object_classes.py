@@ -4,6 +4,10 @@ from typing import Optional
 import bpy  # type: ignore
 
 
+def is_lod_name(name):
+    return bool(name) and name.startswith("LOD") and name[3:].isdigit()
+
+
 @dataclass
 class MeshObject:
     bl_object: bpy.types.Object
@@ -42,17 +46,16 @@ def obj_init(mesh_obj: MeshObject) -> None:
     prefix = name_parts[0]
     second_part = name_parts[1] if len(name_parts) > 1 else None
     mesh_obj.lod = prefix
-    lods = ["LOD1", "LOD2", "LOD3"]
     
     if (prefix == "SM" and second_part == "NITE"):
         mesh_obj.exportname = mesh_obj.name
         mesh_obj.lod = "NITE"
         return
     if mesh_obj.lod == "LOD0":
-        mesh_obj.exportname = mesh_obj.name[5:]
+        mesh_obj.exportname = mesh_obj.name[len(prefix) + 1:]
         return
-    if mesh_obj.lod in lods:
-        mesh_obj.exportname = (mesh_obj.name[5:] + "_" + mesh_obj.lod)
+    if is_lod_name(mesh_obj.lod):
+        mesh_obj.exportname = (mesh_obj.name[len(prefix) + 1:] + "_" + mesh_obj.lod)
     if mesh_obj.lod == "UCX":
         mesh_obj.exportname = mesh_obj.name[9:-3]
     else:
