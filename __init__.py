@@ -12,8 +12,8 @@ bl_info = {
     "name": "DF FN Tools",
     "description": "DF FN Tools",
     "author": "Aloija, GPT",
-    "version": (1, 11, 0),
-    "blender": (4, 2, 0),
+    "version": (1, 12, 0),
+    "blender": (5, 2, 0),
     "category": "Object"
 }
 
