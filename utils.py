@@ -5,7 +5,7 @@ import bmesh # type: ignore
 
 from .mesh_object_classes import MeshObject, is_lod_name
 
-MATERIAL_REASSIGN_SLOT_COUNT = 4
+LEGACY_MATERIAL_REASSIGN_SLOT_COUNT = 4
 
 
 def get_fbx_unit_scale_factor(scene) -> float:
@@ -408,17 +408,27 @@ def apply_single_material(mesh_obj: MeshObject, material):
     mesh_data.materials.append(material)
 
 
+def iter_material_reassign_fields(scene):
+    count = scene.material_reassign_slot_count
+    for i in range(min(count, LEGACY_MATERIAL_REASSIGN_SLOT_COUNT)):
+        yield scene, f"material_from_{i}", f"material_to_{i}"
+
+    extra_count = max(0, count - LEGACY_MATERIAL_REASSIGN_SLOT_COUNT)
+    for i in range(min(extra_count, len(scene.extra_material_reassign_slots))):
+        yield scene.extra_material_reassign_slots[i], "material_from", "material_to"
+
+
 def reassign_materials(mesh_obj: MeshObject, context):
     scene = context.scene
     mesh_data = mesh_obj.mesh
 
     # Карта старых имен материалов к новым
-    material_map = {
-        getattr(scene, f"material_from_{i}"): getattr(scene, f"material_to_{i}")
-        for i in range(4)
-        if getattr(scene, f"material_from_{i}") and getattr(scene, f"material_to_{i}") and
-           getattr(scene, f"material_from_{i}") != getattr(scene, f"material_to_{i}")
-    }
+    material_map = {}
+    for owner, from_field, to_field in iter_material_reassign_fields(scene):
+        from_name = getattr(owner, from_field)
+        to_name = getattr(owner, to_field)
+        if from_name and to_name and from_name != to_name:
+            material_map[from_name] = to_name
 
     if not material_map:
         return

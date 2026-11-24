@@ -1,5 +1,5 @@
 import bpy  # type: ignore
-from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty  # type: ignore
+from bpy.props import BoolProperty, CollectionProperty, EnumProperty, IntProperty, StringProperty  # type: ignore
 
 from . import handlers, updater, utils 
 from .utils import OBJECT_OT_duplicate_clean_join, OBJECT_OT_rename_uv
@@ -31,8 +31,21 @@ class DFFN_AddonPreferences(bpy.types.AddonPreferences):
 
 
 
+class DFT_MaterialReassignSlot(bpy.types.PropertyGroup):
+    material_from: EnumProperty(
+        name="Material",
+        description="Select a material to reassign",
+        items=utils.get_materials,
+    )
+    material_to: StringProperty(
+        name="New Name",
+        description="Enter a new material name",
+    )
+
+
 # все регистрируемые классы  
 classes = (
+    DFT_MaterialReassignSlot,
     DFT_PT_export_panel,
     Exportfbx,
     Open_Folder,
@@ -50,6 +63,13 @@ BAD_TRIANGLES_CLASSES = (
 )
 
 
+def _update_material_reassign_slot_count(scene, _context):
+    slots = scene.extra_material_reassign_slots
+    required = scene.material_reassign_slot_count - utils.LEGACY_MATERIAL_REASSIGN_SLOT_COUNT
+    for _ in range(required - len(slots)):
+        slots.add()
+
+
 def register_scene_properties():
     bpy.types.Scene.auto_update_split_vertex_count = BoolProperty(
         name="Auto Update Split Vertex Count",
@@ -63,7 +83,18 @@ def register_scene_properties():
         description="Number of split vertices based on UV and normals",
     )
 
-    for i in range(utils.MATERIAL_REASSIGN_SLOT_COUNT):
+    bpy.types.Scene.extra_material_reassign_slots = CollectionProperty(type=DFT_MaterialReassignSlot)
+    bpy.types.Scene.material_reassign_slot_count = IntProperty(
+        name="Slots",
+        description="Number of material reassignment rules to use during export",
+        default=utils.LEGACY_MATERIAL_REASSIGN_SLOT_COUNT,
+        min=1,
+        options=set(),
+        update=_update_material_reassign_slot_count,
+    )
+
+    # Keep the original scene properties so existing blend files retain their rules.
+    for i in range(utils.LEGACY_MATERIAL_REASSIGN_SLOT_COUNT):
         setattr(
             bpy.types.Scene,
             f"material_from_{i}",
@@ -85,7 +116,7 @@ def register_scene_properties():
 
 
 def unregister_scene_properties():
-    for i in range(utils.MATERIAL_REASSIGN_SLOT_COUNT):
+    for i in range(utils.LEGACY_MATERIAL_REASSIGN_SLOT_COUNT):
         from_attr = f"material_from_{i}"
         to_attr = f"material_to_{i}"
         if hasattr(bpy.types.Scene, from_attr):
@@ -93,7 +124,12 @@ def unregister_scene_properties():
         if hasattr(bpy.types.Scene, to_attr):
             delattr(bpy.types.Scene, to_attr)
 
-    for attr in ("auto_update_split_vertex_count", "split_vertex_count"):
+    for attr in (
+        "auto_update_split_vertex_count",
+        "split_vertex_count",
+        "material_reassign_slot_count",
+        "extra_material_reassign_slots",
+    ):
         if hasattr(bpy.types.Scene, attr):
             delattr(bpy.types.Scene, attr)
 

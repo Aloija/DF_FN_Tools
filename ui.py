@@ -11,7 +11,7 @@ from .bad_triangles import (
     has_color_layer,
     select_bad_triangles,
 )
-from .utils import get_fbx_unit_scale_factor
+from .utils import get_fbx_unit_scale_factor, iter_material_reassign_fields
 
 
 # ---------------------------------------------------------------------------
@@ -495,11 +495,12 @@ class DFT_PT_export_panel(bpy.types.Panel):
         if scene.reassigne_materials:
             box = layout.box()
             box.label(text="Reassign Materials:")
-            for i in range(4):
+            box.prop(scene, 'material_reassign_slot_count')
+            for owner, from_field, to_field in iter_material_reassign_fields(scene):
                 row_from = box.row()
-                row_from.prop(scene, f"material_from_{i}", text="From")
+                row_from.prop(owner, from_field, text="From")
                 row_to = box.row()
-                row_to.prop(scene, f"material_to_{i}", text="To")
+                row_to.prop(owner, to_field, text="To")
 
         row = self.layout.row()
         row.operator("object.exportfbx_operator", text="Export")
